@@ -1,7 +1,7 @@
 import os
-import json
 import glob
 import zipfile
+import json
 
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse
@@ -11,7 +11,7 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 
-def get_files(request):
+def search_files(request):
     base_folder = settings.BASE_FILE_OPERATIONS_FOLDER
     wildcard = request.GET.get('wildcard', '')
 
@@ -20,7 +20,7 @@ def get_files(request):
     else:
         final_wildcard = "/**/*"
 
-    filepaths = glob.glob(base_folder + final_wildcard, recursive=True)
+    filepaths = glob.glob(f'{base_folder}{final_wildcard}', recursive=True)
 
     return filepaths
 
@@ -38,14 +38,12 @@ def get_files(request):
     ]
 )
 @api_view(['GET'])
-def search_files(request):
+def search_files_view(request):
     base_folder = settings.BASE_FILE_OPERATIONS_FOLDER
-
-    filepaths = get_files(request)
+    filepaths = search_files(request)
     filepaths = [os.path.relpath(filepath, base_folder)
                  for filepath in filepaths]
     response_data = {'filepaths': filepaths}
-
     return JsonResponse(response_data)
 
 
@@ -62,18 +60,16 @@ def search_files(request):
     ]
 )
 @api_view(['GET'])
-def download_files(request):
+def download_files_view(request):
     base_folder = settings.BASE_FILE_OPERATIONS_FOLDER
-
-    filepaths = get_files(request)
+    filepaths = search_files(request)
 
     if len(filepaths) == 0:
         return JsonResponse({'message': 'No files to download'})
 
     response = HttpResponse(content_type='application/zip')
     zip_filename = 'downloaded_files.zip'
-    response['Content-Disposition'] = 'attachment; filename="{0}"'.format(
-        zip_filename)
+    response['Content-Disposition'] = f'attachment; filename="{zip_filename}"'
 
     with zipfile.ZipFile(response, 'w') as zip_file:
         for filepath in filepaths:
@@ -91,13 +87,12 @@ def download_files(request):
     }
 ), responses={200: openapi.Response('OK')})
 @api_view(['POST'])
-def move_file(request):
+def move_file_view(request):
     base_folder = settings.BASE_FILE_OPERATIONS_FOLDER
+    request_data = json.loads(request.body)
 
-    request_body = json.loads(request.body)
-
-    source_path_relative = request_body.get('source_path', '')
-    destination_path_relative = request_body.get('destination_path', '')
+    source_path_relative = request_data.get('source_path', '')
+    destination_path_relative = request_data.get('destination_path', '')
 
     source_path = os.path.join(base_folder, source_path_relative)
     destination_path = os.path.join(base_folder, destination_path_relative)
